@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
 st.set_page_config(page_title="Financial Dashboard", layout="wide")
 
@@ -25,7 +24,6 @@ if uploaded_file:
     # KPIs
     # ------------------------------
     st.subheader("Key Performance Indicators (KPIs)")
-
     kpi_cols = st.columns(4)
 
     if "Sales" in df.columns:
@@ -49,36 +47,43 @@ if uploaded_file:
     # ------------------------------
     if "Year" in df.columns:
         st.subheader("📈 Yearly Trends")
-        yearly = df.groupby("Year").agg({
-            "Sales": "sum",
-            "Profit": "sum",
-            "Units Sold": "sum"
-        }).reset_index()
 
-        yearly["Sales_YoY_%"] = yearly["Sales"].pct_change() * 100
-        yearly["Profit_YoY_%"] = yearly["Profit"].pct_change() * 100
+        agg_dict = {}
+        for col in ["Sales", "Profit", "Units Sold"]:
+            if col in df.columns:
+                agg_dict[col] = "sum"
 
-        st.dataframe(yearly)
+        if agg_dict:  # only run if we have some numeric columns
+            yearly = df.groupby("Year").agg(agg_dict).reset_index()
 
-        st.line_chart(yearly.set_index("Year")[["Sales", "Profit"]])
+            if "Sales" in yearly.columns:
+                yearly["Sales_YoY_%"] = yearly["Sales"].pct_change() * 100
+            if "Profit" in yearly.columns:
+                yearly["Profit_YoY_%"] = yearly["Profit"].pct_change() * 100
+
+            st.dataframe(yearly)
+
+            chart_cols = [col for col in ["Sales", "Profit"] if col in yearly.columns]
+            if chart_cols:
+                st.line_chart(yearly.set_index("Year")[chart_cols])
 
     # ------------------------------
     # Segment Analysis
     # ------------------------------
     if "Segment" in df.columns:
         st.subheader("📊 Segment Analysis")
-        seg = df.groupby("Segment").agg({"Sales": "sum", "Profit": "sum"}).reset_index()
-        seg["Gross_Margin_%"] = (seg["Profit"] / seg["Sales"]) * 100
 
+        seg = df.groupby("Segment").sum().reset_index()
         st.dataframe(seg)
 
-        st.bar_chart(seg.set_index("Segment")[["Sales", "Profit"]])
-        st.line_chart(seg.set_index("Segment")[["Gross_Margin_%"]])
+        numeric_cols = [c for c in ["Sales", "Profit"] if c in seg.columns]
+        if numeric_cols:
+            st.bar_chart(seg.set_index("Segment")[numeric_cols])
 
     # ------------------------------
     # Top 10 Products
     # ------------------------------
-    if "Product" in df.columns:
+    if "Product" in df.columns and "Sales" in df.columns:
         st.subheader("🏆 Top 10 Products by Sales")
         top_products = df.groupby("Product")["Sales"].sum().nlargest(10).reset_index()
         st.bar_chart(top_products.set_index("Product"))
@@ -86,7 +91,7 @@ if uploaded_file:
     # ------------------------------
     # Country-wise Analysis
     # ------------------------------
-    if "Country" in df.columns:
+    if "Country" in df.columns and "Profit" in df.columns:
         st.subheader("🌍 Top 10 Countries by Profit")
         top_countries = df.groupby("Country")["Profit"].sum().nlargest(10).reset_index()
         st.bar_chart(top_countries.set_index("Country"))
